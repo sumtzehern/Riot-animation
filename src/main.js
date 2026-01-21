@@ -11,7 +11,8 @@ import peeringData from './data/peering.json';
 // ============================================================================
 
 // Earth texture URL - replace with your own if needed
-const EARTH_TEXTURE_URL = '//unpkg.com/three-globe/example/img/earth-blue-marble.jpg';
+// const EARTH_TEXTURE_URL = '//unpkg.com/three-globe/example/img/earth-blue-marble.jpg'; // Blue marble texture
+const EARTH_TEXTURE_URL = '//unpkg.com/three-globe/example/img/earth-dark.jpg';
 const EARTH_BUMP_URL = '//unpkg.com/three-globe/example/img/earth-topology.png';
 
 // Visual settings
