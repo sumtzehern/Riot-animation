@@ -1,0 +1,52 @@
+{
+  "cities": [
+    {
+      "city": "Hong Kong",
+      "lat": 22.3193,
+      "lng": 114.1694,
+      "partners": ["Telia", "HKBN", "PCCW-TRANSIT", "CMHK-PNI", "Tencent"]
+    },
+    {
+      "city": "Tokyo",
+      "lat": 35.6762,
+      "lng": 139.6503,
+      "partners": ["JPIX", "PCCW", "NTT", "Tencent-PNI"]
+    },
+    {
+      "city": "Singapore",
+      "lat": 1.3521,
+      "lng": 103.8198,
+      "partners": ["Equinix", "SingTel", "PCCW", "Telia"]
+    },
+    {
+      "city": "Los Angeles",
+      "lat": 34.0522,
+      "lng": -118.2437,
+      "partners": ["Cogent", "Level3", "GTT", "Zayo", "Hurricane Electric"]
+    },
+    {
+      "city": "Frankfurt",
+      "lat": 50.1109,
+      "lng": 8.6821,
+      "partners": ["DE-CIX", "Telia", "Cogent", "GTT"]
+    },
+    {
+      "city": "Sydney",
+      "lat": -33.8688,
+      "lng": 151.2093,
+      "partners": ["Equinix", "Telstra", "PIPE Networks"]
+    },
+    {
+      "city": "São Paulo",
+      "lat": -23.5505,
+      "lng": -46.6333,
+      "partners": ["IX.br", "Telefonica", "Claro", "Lumen"]
+    },
+    {
+      "city": "Seoul",
+      "lat": 37.5665,
+      "lng": 126.9780,
+      "partners": ["KINX", "KT", "SKB", "LG Uplus"]
+    }
+  ]
+}
