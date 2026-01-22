@@ -4,10 +4,10 @@
  * Visual Semantics:
  * - RIOT locations: Red pins + city labels (reference only, no arcs)
  * - Tencent POPs: Blue pins, no labels (main network nodes)
- * - Partners: Small labels near POPs
+ * - Partners: Small labels near POPs (arranged in dynamic rings)
  * 
  * Arc Logic:
- * - POP → Partner: Local fan-out arcs (dotted, animated)
+ * - POP → Partner: Local fan-out arcs (dotted, animated, dominant)
  * - Hub → Hub: Regional backbone arcs (subtle, elegant)
  */
 
@@ -23,7 +23,17 @@ const EARTH_TEXTURE_URL = '//unpkg.com/three-globe/example/img/earth-night.jpg';
 const EARTH_BUMP_URL = '//unpkg.com/three-globe/example/img/earth-topology.png';
 
 const CONFIG = {
-  // RIOT locations (red pins + city labels)
+  // ===== GLOBAL ANIMATION TOGGLE =====
+  // Set to false to disable all animations (arc dash movement + auto rotate)
+  ENABLE_ANIMATION: true,
+
+  // ===== ARC FILTERING =====
+  // Skip arcs where partner name normalizes to this
+  selfPartnerName: 'tencent',
+  // Skip arcs shorter than this distance (km)
+  minArcDistanceKm: 15,
+
+  // ===== RIOT locations (red pins + city labels) =====
   riotPinColor: '#ff4646',
   riotPinAltitude: 0.02,
   riotPinRadius: 1.0,
@@ -31,74 +41,59 @@ const CONFIG = {
   riotLabelSize: 1.0,
   riotLabelAltitude: 0.03,
 
-  // Tencent POPs (blue pins, no labels)
+  // ===== Tencent POPs (blue pins, no labels) =====
   popPinColor: '#3458b0',
   popPinAltitude: 0.015,
   popPinRadius: 0.7,
 
-  // Partners (small labels near POPs)
-  partnerLabelColor: 'rgba(255, 255, 255, 0.7)',
-  partnerLabelSize: 0.5,
-  partnerLabelAltitude: 0.01,
+  // ===== Partners (small labels + optional anchor dots) =====
+  partnerLabelColor: 'rgba(255, 255, 255, 0.75)',
+  partnerLabelSize: 0.45,
+  partnerLabelAltitude: 0.012,
+  // Partner anchor dots (small dots at partner positions for visibility)
+  partnerDotColor: 'rgba(100, 181, 246, 0.6)',
+  partnerDotRadius: 0.25,
+  partnerDotAltitude: 0.008,
 
-  // Local fan-out arcs (POP → Partner)
-  localArcColors: ['#3458b0', '#64b5f6'],
-  localArcAltitude: 0.05,
-  localArcStroke: 0.6,
-  localArcDashLength: 0.3,
-  localArcDashGap: 0.15,
-  localArcDashAnimateTime: 2000,
+  // ===== Dynamic ring radius for partner positioning =====
+  // Based on partner count per POP
+  ringRadius: {
+    small: { min: 2, max: 4, radiusMin: 0.6, radiusMax: 0.9 },   // degrees
+    medium: { min: 5, max: 8, radiusMin: 1.0, radiusMax: 1.4 },
+    large: { min: 9, max: Infinity, radiusMin: 1.6, radiusMax: 2.2 }
+  },
+  // Maximum latitude offset (clamp to avoid poles)
+  maxLatitudeOffset: 85,
 
-  // Backbone arcs (Hub → Hub)
-  backboneArcColors: ['#3458b0', '#1a237e'],
-  backboneArcAltitude: 0.25,
-  backboneArcStroke: 0.4,
-  backboneArcDashLength: 0.5,
-  backboneArcDashGap: 0.3,
-  backboneArcDashAnimateTime: 4000,
+  // ===== Local fan-out arcs (POP → Partner) - DOMINANT =====
+  localArcColors: ['rgba(100, 181, 246, 0.85)', 'rgba(52, 88, 176, 0.85)'],
+  localArcAltitudeShort: 0.18,   // For short arcs (more visible)
+  localArcAltitudeLong: 0.08,   // For long arcs
+  localArcStrokeShort: 0.9,     // Thicker for short arcs
+  localArcStrokeLong: 0.5,
+  localArcDashLength: 0.25,
+  localArcDashGap: 0.12,
+  localArcDashAnimateTime: 1500,  // Faster, more visible motion
 
-  // Camera
+  // ===== Backbone arcs (Hub → Hub) - SUBTLE =====
+  backboneArcColors: ['rgba(52, 88, 176, 0.4)', 'rgba(26, 35, 126, 0.4)'],
+  backboneArcAltitude: 0.3,
+  backboneArcStroke: 0.3,
+  backboneArcDashLength: 0.6,
+  backboneArcDashGap: 0.4,
+  backboneArcDashAnimateTime: 6000,  // Slower, calmer animation
+
+  // ===== Camera =====
   initialAltitude: 2.4,
   cameraFlyDuration: 1500,
 
-  // Auto rotate
-  autoRotateSpeed: 0.6
+  // ===== Auto rotate =====
+  autoRotateSpeed: 0.5
 };
 
 // ============================================================================
-// REGION ASSIGNMENT
+// UTILITY: HAVERSINE DISTANCE
 // ============================================================================
-
-/**
- * Assigns a region based on geographic coordinates.
- * Rules:
- *   - APAC: lng >= 60
- *   - EMEA: lng > -30 AND lng < 60
- *   - NA (North America): lng <= -30 AND lat >= 15
- *   - LATAM: lng <= -30 AND lat < 15
- */
-function assignRegion(lat, lng) {
-  if (lng >= 60) return 'APAC';
-  if (lng > -30 && lng < 60) return 'EMEA';
-  if (lng <= -30 && lat >= 15) return 'NA';
-  if (lng <= -30 && lat < 15) return 'LATAM';
-  return 'UNKNOWN';
-}
-
-// ============================================================================
-// HUB RESOLUTION
-// ============================================================================
-
-/**
- * Predefined hub cities for each region.
- * These are the primary backbone connection points.
- */
-const HUB_CITIES = {
-  APAC: { name: 'Singapore', lat: 1.3521, lng: 103.8198 },
-  EMEA: { name: 'Frankfurt', lat: 50.1109, lng: 8.6821 },
-  NA: { name: 'Los Angeles', lat: 34.0522, lng: -118.2437 },
-  LATAM: { name: 'Sao Paulo', lat: -23.5558, lng: -46.6396 }
-};
 
 /**
  * Calculate haversine distance between two points (in km).
@@ -113,23 +108,160 @@ function haversineDistance(lat1, lng1, lat2, lng2) {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
+// ============================================================================
+// ARC FILTERING
+// ============================================================================
+
 /**
- * Finds the hub POP for a given region.
- * First tries to match the predefined hub city, then falls back to nearest POP.
+ * Determines if an arc should be filtered out.
+ * Rules:
+ * 1. Partner name normalizes to "Tencent" (self-arc)
+ * 2. Distance between POP and partner < minArcDistanceKm
  */
+function shouldFilterArc(partnerName, popLat, popLng, partnerLat, partnerLng) {
+  // Rule 1: Self-arc (Tencent partner)
+  if (partnerName.toLowerCase().trim() === CONFIG.selfPartnerName) {
+    return true;
+  }
+
+  // Rule 2: Too close (near-duplicate)
+  const distance = haversineDistance(popLat, popLng, partnerLat, partnerLng);
+  if (distance < CONFIG.minArcDistanceKm) {
+    return true;
+  }
+
+  return false;
+}
+
+// ============================================================================
+// DYNAMIC RING RADIUS FOR PARTNER POSITIONING
+// ============================================================================
+
+/**
+ * Calculate ring radius based on partner count.
+ * More partners = larger ring to avoid overlap.
+ */
+function getRingRadius(partnerCount) {
+  const { small, medium, large } = CONFIG.ringRadius;
+  
+  if (partnerCount <= small.max) {
+    // Linear interpolation within small range
+    const t = (partnerCount - small.min) / (small.max - small.min + 1);
+    return small.radiusMin + t * (small.radiusMax - small.radiusMin);
+  } else if (partnerCount <= medium.max) {
+    const t = (partnerCount - medium.min) / (medium.max - medium.min + 1);
+    return medium.radiusMin + t * (medium.radiusMax - medium.radiusMin);
+  } else {
+    // Large: cap at max
+    const t = Math.min((partnerCount - large.min) / 5, 1);
+    return large.radiusMin + t * (large.radiusMax - large.radiusMin);
+  }
+}
+
+/**
+ * Position partners in a ring around the POP.
+ * Applies:
+ * - Dynamic radius based on partner count
+ * - cos(lat) correction for longitude
+ * - Latitude clamp to avoid poles
+ */
+function positionPartnersInRing(popLat, popLng, partners) {
+  const count = partners.length;
+  if (count === 0) return [];
+
+  const baseRadius = getRingRadius(count);
+  const angleStep = (2 * Math.PI) / count;
+
+  return partners.map((partner, index) => {
+    const angle = angleStep * index - Math.PI / 2; // Start from top
+    
+    // Apply cos(lat) correction for longitude to maintain circular appearance
+    const cosLat = Math.cos(popLat * Math.PI / 180);
+    const lngCorrection = cosLat > 0.1 ? 1 / cosLat : 10; // Avoid division issues near poles
+    
+    let newLat = popLat + baseRadius * Math.sin(angle);
+    let newLng = popLng + baseRadius * Math.cos(angle) * Math.min(lngCorrection, 3);
+    
+    // Clamp latitude to avoid pole issues
+    newLat = Math.max(-CONFIG.maxLatitudeOffset, Math.min(CONFIG.maxLatitudeOffset, newLat));
+    
+    return {
+      ...partner,
+      lat: newLat,
+      lng: newLng,
+      originalLat: partner.lat,
+      originalLng: partner.lng
+    };
+  });
+}
+
+// ============================================================================
+// DISTANCE-BASED ARC PROPERTIES
+// ============================================================================
+
+/**
+ * Calculate arc altitude based on distance.
+ * Short arcs get higher altitude to be more visible.
+ */
+function getLocalArcAltitude(distanceKm) {
+  // Short arcs (< 100km): higher altitude
+  // Long arcs (> 500km): lower altitude
+  // Linear interpolation between
+  const minDist = 50;
+  const maxDist = 500;
+  const t = Math.min(1, Math.max(0, (distanceKm - minDist) / (maxDist - minDist)));
+  return CONFIG.localArcAltitudeShort * (1 - t) + CONFIG.localArcAltitudeLong * t;
+}
+
+/**
+ * Calculate arc stroke based on distance.
+ * Short arcs get thicker stroke to be more visible.
+ */
+function getLocalArcStroke(distanceKm) {
+  const minDist = 50;
+  const maxDist = 500;
+  const t = Math.min(1, Math.max(0, (distanceKm - minDist) / (maxDist - minDist)));
+  return CONFIG.localArcStrokeShort * (1 - t) + CONFIG.localArcStrokeLong * t;
+}
+
+// ============================================================================
+// REGION ASSIGNMENT
+// ============================================================================
+
+/**
+ * Assigns a region based on geographic coordinates.
+ */
+function assignRegion(lat, lng) {
+  if (lng >= 60) return 'APAC';
+  if (lng > -30 && lng < 60) return 'EMEA';
+  if (lng <= -30 && lat >= 15) return 'NA';
+  if (lng <= -30 && lat < 15) return 'LATAM';
+  return 'UNKNOWN';
+}
+
+// ============================================================================
+// HUB RESOLUTION
+// ============================================================================
+
+const HUB_CITIES = {
+  APAC: { name: 'Singapore', lat: 1.3521, lng: 103.8198 },
+  EMEA: { name: 'Frankfurt', lat: 50.1109, lng: 8.6821 },
+  NA: { name: 'Los Angeles', lat: 34.0522, lng: -118.2437 },
+  LATAM: { name: 'Sao Paulo', lat: -23.5558, lng: -46.6396 }
+};
+
 function resolveHubForRegion(region, popsInRegion) {
   if (!popsInRegion || popsInRegion.length === 0) return null;
 
   const hubCity = HUB_CITIES[region];
-  if (!hubCity) return popsInRegion[0]; // Fallback to first POP
+  if (!hubCity) return popsInRegion[0];
 
-  // Try exact match by city name
   const exactMatch = popsInRegion.find(
     pop => pop.city.toLowerCase() === hubCity.name.toLowerCase()
   );
   if (exactMatch) return exactMatch;
 
-  // Fallback: find nearest POP to the hub coordinates
+  // Fallback: nearest POP
   let nearest = popsInRegion[0];
   let minDist = haversineDistance(hubCity.lat, hubCity.lng, nearest.lat, nearest.lng);
 
@@ -149,7 +281,7 @@ function resolveHubForRegion(region, popsInRegion) {
 // ============================================================================
 
 function processData(riotData, partnerData) {
-  // 1. Process RIOT locations (red pins + city labels, no network participation)
+  // 1. Process RIOT locations
   const riotPoints = riotData.locations.map(location => ({
     lat: location.lat,
     lng: location.lng,
@@ -158,13 +290,14 @@ function processData(riotData, partnerData) {
     type: 'riot'
   }));
 
-  // 2. Process Tencent POPs (blue pins, positioned at riotLat/riotLng in peering.json)
+  // 2. Process Tencent POPs and partners
   const popPoints = [];
   const partnerLabels = [];
+  const partnerDots = [];
   const localArcs = [];
-
-  // Group POPs by region for hub resolution
   const popsByRegion = { APAC: [], EMEA: [], NA: [], LATAM: [] };
+
+  let filteredArcCount = 0;
 
   partnerData.partners.forEach(cityData => {
     const popLat = cityData.riotLat;
@@ -176,7 +309,8 @@ function processData(riotData, partnerData) {
       lng: popLng,
       city: cityData.city,
       region: region,
-      type: 'pop'
+      type: 'pop',
+      partnerCount: cityData.partners.length
     };
 
     popPoints.push(popPoint);
@@ -185,9 +319,20 @@ function processData(riotData, partnerData) {
       popsByRegion[region].push(popPoint);
     }
 
-    // Process partners for this POP
-    cityData.partners.forEach(partner => {
-      // Partner labels (small text near POP)
+    // Filter and position partners
+    const validPartners = cityData.partners.filter(partner => {
+      const shouldFilter = shouldFilterArc(
+        partner.name, popLat, popLng, partner.lat, partner.lng
+      );
+      if (shouldFilter) filteredArcCount++;
+      return !shouldFilter;
+    });
+
+    // Position partners in a ring around the POP
+    const positionedPartners = positionPartnersInRing(popLat, popLng, validPartners);
+
+    positionedPartners.forEach(partner => {
+      // Partner label
       partnerLabels.push({
         lat: partner.lat,
         lng: partner.lng,
@@ -196,7 +341,19 @@ function processData(riotData, partnerData) {
         type: 'partner'
       });
 
-      // Local fan-out arc: POP → Partner
+      // Partner anchor dot (small visual marker)
+      partnerDots.push({
+        lat: partner.lat,
+        lng: partner.lng,
+        name: partner.name,
+        city: cityData.city,
+        type: 'partnerDot'
+      });
+
+      // Calculate distance for arc properties
+      const distance = haversineDistance(popLat, popLng, partner.lat, partner.lng);
+
+      // Local fan-out arc
       localArcs.push({
         startLat: popLat,
         startLng: popLng,
@@ -204,7 +361,8 @@ function processData(riotData, partnerData) {
         endLng: partner.lng,
         city: cityData.city,
         partner: partner.name,
-        type: 'local'
+        type: 'local',
+        distance: distance
       });
     });
   });
@@ -217,17 +375,13 @@ function processData(riotData, partnerData) {
 
   // 4. Generate backbone arcs (Hub → Hub only)
   const backboneArcs = [];
-  const regions = Object.keys(hubs).filter(r => hubs[r] !== null);
-
-  // Create hub-to-hub connections (simple chain + cross-links for resilience visual)
-  // APAC <-> EMEA <-> NA <-> LATAM (and APAC <-> NA for Pacific route)
   const hubConnections = [
-    ['APAC', 'EMEA'],   // Asia-Europe backbone
-    ['EMEA', 'NA'],     // Trans-Atlantic
-    ['NA', 'LATAM'],    // Americas backbone
-    ['APAC', 'NA'],     // Trans-Pacific
-    ['EMEA', 'LATAM'],  // Europe-South America
-    ['APAC', 'LATAM']   // Asia-South America (optional, for completeness)
+    ['APAC', 'EMEA'],
+    ['EMEA', 'NA'],
+    ['NA', 'LATAM'],
+    ['APAC', 'NA'],
+    ['EMEA', 'LATAM'],
+    ['APAC', 'LATAM']
   ];
 
   hubConnections.forEach(([regionA, regionB]) => {
@@ -249,7 +403,7 @@ function processData(riotData, partnerData) {
     }
   });
 
-  // 5. Create RIOT city labels (positioned at RIOT locations)
+  // 5. RIOT city labels
   const riotLabels = riotPoints.map(rp => ({
     lat: rp.lat,
     lng: rp.lng,
@@ -261,11 +415,13 @@ function processData(riotData, partnerData) {
     riotPoints,
     popPoints,
     partnerLabels,
+    partnerDots,
     riotLabels,
     localArcs,
     backboneArcs,
     hubs,
-    popsByRegion
+    popsByRegion,
+    filteredArcCount
   };
 }
 
@@ -283,11 +439,13 @@ const {
   riotPoints,
   popPoints,
   partnerLabels,
+  partnerDots,
   riotLabels,
   localArcs,
   backboneArcs,
   hubs,
-  popsByRegion
+  popsByRegion,
+  filteredArcCount
 } = processData(riotLocations, peeringData);
 
 const globe = Globe()
@@ -305,9 +463,9 @@ globe(container);
 // Set initial camera position
 globe.pointOfView({ lat: 30, lng: 120, altitude: CONFIG.initialAltitude }, 0);
 
-// Enable auto rotate
+// Auto rotate (controlled by ENABLE_ANIMATION)
 const controls = globe.controls();
-controls.autoRotate = true;
+controls.autoRotate = CONFIG.ENABLE_ANIMATION;
 controls.autoRotateSpeed = CONFIG.autoRotateSpeed;
 
 // ============================================================================
@@ -337,23 +495,36 @@ function hideTooltip() {
 }
 
 // ============================================================================
-// RENDER: POINTS (RIOT + POPs)
+// RENDER: POINTS (RIOT + POPs + Partner anchor dots)
 // ============================================================================
 
 const allPoints = [
   ...riotPoints,
-  ...popPoints
+  ...popPoints,
+  ...partnerDots
 ];
 
 globe
   .pointsData(allPoints)
   .pointLat('lat')
   .pointLng('lng')
-  .pointAltitude(d => d.type === 'riot' ? CONFIG.riotPinAltitude : CONFIG.popPinAltitude)
-  .pointRadius(d => d.type === 'riot' ? CONFIG.riotPinRadius : CONFIG.popPinRadius)
-  .pointColor(d => d.type === 'riot' ? CONFIG.riotPinColor : CONFIG.popPinColor)
+  .pointAltitude(d => {
+    if (d.type === 'riot') return CONFIG.riotPinAltitude;
+    if (d.type === 'pop') return CONFIG.popPinAltitude;
+    return CONFIG.partnerDotAltitude;
+  })
+  .pointRadius(d => {
+    if (d.type === 'riot') return CONFIG.riotPinRadius;
+    if (d.type === 'pop') return CONFIG.popPinRadius;
+    return CONFIG.partnerDotRadius;
+  })
+  .pointColor(d => {
+    if (d.type === 'riot') return CONFIG.riotPinColor;
+    if (d.type === 'pop') return CONFIG.popPinColor;
+    return CONFIG.partnerDotColor;
+  })
   .onPointClick((point) => {
-    if (point) {
+    if (point && (point.type === 'riot' || point.type === 'pop')) {
       globe.pointOfView(
         { lat: point.lat, lng: point.lng, altitude: 1.2 },
         CONFIG.cameraFlyDuration
@@ -376,7 +547,14 @@ globe
           <div class="pop-tooltip">
             <strong>Tencent POP</strong><br>
             ${point.city}${isHub ? ' (Regional Hub)' : ''}<br>
-            <small>Region: ${point.region}</small>
+            <small>Region: ${point.region} | Partners: ${point.partnerCount}</small>
+          </div>
+        `);
+      } else if (point.type === 'partnerDot') {
+        showTooltip(`
+          <div class="partner-tooltip">
+            <strong>${point.name}</strong><br>
+            <small>Peering with ${point.city}</small>
           </div>
         `);
       }
@@ -420,19 +598,28 @@ globe
   .arcEndLat('endLat')
   .arcEndLng('endLng')
   .arcColor(d => d.type === 'backbone' ? CONFIG.backboneArcColors : CONFIG.localArcColors)
-  .arcAltitude(d => d.type === 'backbone' ? CONFIG.backboneArcAltitude : CONFIG.localArcAltitude)
-  .arcStroke(d => d.type === 'backbone' ? CONFIG.backboneArcStroke : CONFIG.localArcStroke)
+  .arcAltitude(d => {
+    if (d.type === 'backbone') return CONFIG.backboneArcAltitude;
+    return getLocalArcAltitude(d.distance || 100);
+  })
+  .arcStroke(d => {
+    if (d.type === 'backbone') return CONFIG.backboneArcStroke;
+    return getLocalArcStroke(d.distance || 100);
+  })
   .arcDashLength(d => d.type === 'backbone' ? CONFIG.backboneArcDashLength : CONFIG.localArcDashLength)
   .arcDashGap(d => d.type === 'backbone' ? CONFIG.backboneArcDashGap : CONFIG.localArcDashGap)
   .arcDashInitialGap(() => Math.random())
-  .arcDashAnimateTime(d => d.type === 'backbone' ? CONFIG.backboneArcDashAnimateTime : CONFIG.localArcDashAnimateTime)
+  .arcDashAnimateTime(d => {
+    if (!CONFIG.ENABLE_ANIMATION) return 0; // Disable animation
+    return d.type === 'backbone' ? CONFIG.backboneArcDashAnimateTime : CONFIG.localArcDashAnimateTime;
+  })
   .onArcHover((arc) => {
     if (arc) {
       if (arc.type === 'backbone') {
         showTooltip(`
           <div class="backbone-tooltip">
-            <strong>Backbone Connection</strong><br>
-            ${arc.fromHub} (${arc.fromRegion}) → ${arc.toHub} (${arc.toRegion})
+            <strong>Global Backbone</strong><br>
+            ${arc.fromHub} (${arc.fromRegion}) ↔ ${arc.toHub} (${arc.toRegion})
           </div>
         `);
       } else {
@@ -462,7 +649,9 @@ function pauseAutoRotate() {
 function resumeAutoRotateLater() {
   clearTimeout(idleTimer);
   idleTimer = setTimeout(() => {
-    controls.autoRotate = true;
+    if (CONFIG.ENABLE_ANIMATION) {
+      controls.autoRotate = true;
+    }
   }, 4000);
 }
 
@@ -489,13 +678,21 @@ if (import.meta.env.DEV) {
       riotPoints,
       popPoints,
       partnerLabels,
+      partnerDots,
       riotLabels,
       localArcs,
       backboneArcs,
       hubs,
       popsByRegion
     },
-    config: CONFIG
+    config: CONFIG,
+    toggleAnimation: (enabled) => {
+      CONFIG.ENABLE_ANIMATION = enabled;
+      controls.autoRotate = enabled;
+      // Re-render arcs with new animation setting
+      globe.arcsData([...localArcs, ...backboneArcs]);
+      console.log(`Animation ${enabled ? 'enabled' : 'disabled'}`);
+    }
   };
 
   console.log('Tencent Peering Globe initialized:', {
@@ -504,6 +701,8 @@ if (import.meta.env.DEV) {
     partners: partnerLabels.length,
     localArcs: localArcs.length,
     backboneArcs: backboneArcs.length,
-    hubs: Object.entries(hubs).map(([r, h]) => `${r}: ${h?.city || 'none'}`).join(', ')
+    filteredArcs: filteredArcCount,
+    hubs: Object.entries(hubs).map(([r, h]) => `${r}: ${h?.city || 'none'}`).join(', '),
+    animationEnabled: CONFIG.ENABLE_ANIMATION
   });
 }
