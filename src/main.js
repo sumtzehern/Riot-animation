@@ -67,13 +67,13 @@ const CONFIG = {
 
   // ===== Local fan-out arcs (POP → Partner) - DOMINANT =====
   localArcColors: ['rgba(100, 181, 246, 0.85)', 'rgba(52, 88, 176, 0.85)'],
-  localArcAltitudeShort: 0.18,   // For short arcs (more visible)
-  localArcAltitudeLong: 0.08,   // For long arcs
+  localArcAltitudeShort: 0.015,   // For short arcs (more visible)
+  localArcAltitudeLong: 0.01,   // For long arcs
   localArcStrokeShort: 0.9,     // Thicker for short arcs
   localArcStrokeLong: 0.5,
-  localArcDashLength: 0.25,
-  localArcDashGap: 0.12,
-  localArcDashAnimateTime: 1500,  // Faster, more visible motion
+  localArcDashLength: 1,
+  localArcDashGap: 0.3,
+  localArcDashAnimateTime: 2800,  // Faster, more visible motion
 
   // ===== Backbone arcs (Hub → Hub) - SUBTLE =====
   backboneArcColors: ['rgba(52, 88, 176, 0.4)', 'rgba(26, 35, 126, 0.4)'],
@@ -81,11 +81,11 @@ const CONFIG = {
   backboneArcStroke: 0.3,
   backboneArcDashLength: 0.6,
   backboneArcDashGap: 0.4,
-  backboneArcDashAnimateTime: 6000,  // Slower, calmer animation
+  backboneArcDashAnimateTime: 8000,  // Slower, calmer animation
 
   // ===== Camera =====
   initialAltitude: 2.4,
-  cameraFlyDuration: 1500,
+  cameraFlyDuration: 4500,
 
   // ===== Auto rotate =====
   autoRotateSpeed: 0.5
@@ -109,90 +109,189 @@ function haversineDistance(lat1, lng1, lat2, lng2) {
 }
 
 // ============================================================================
-// ARC FILTERING
+// PARTNER DATA NORMALIZATION
 // ============================================================================
 
 /**
- * Determines if an arc should be filtered out.
+ * Normalize and de-duplicate partners for a city.
+ * 
  * Rules:
- * 1. Partner name normalizes to "Tencent" (self-arc)
- * 2. Distance between POP and partner < minArcDistanceKm
+ * 1. Extract unique partner names (de-dup by name)
+ * 2. Filter out "Tencent" (self-partner)
+ * 3. Sort alphabetically for deterministic ordering
+ * 
+ * @param {Object} cityData - City data from peering.json
+ * @returns {string[]} - Sorted array of unique partner names
  */
-function shouldFilterArc(partnerName, popLat, popLng, partnerLat, partnerLng) {
-  // Rule 1: Self-arc (Tencent partner)
-  if (partnerName.toLowerCase().trim() === CONFIG.selfPartnerName) {
-    return true;
+function normalizePartners(cityData) {
+  if (!cityData.partners || !Array.isArray(cityData.partners)) {
+    return [];
   }
-
-  // Rule 2: Too close (near-duplicate)
-  const distance = haversineDistance(popLat, popLng, partnerLat, partnerLng);
-  if (distance < CONFIG.minArcDistanceKm) {
-    return true;
-  }
-
-  return false;
-}
-
-// ============================================================================
-// DYNAMIC RING RADIUS FOR PARTNER POSITIONING
-// ============================================================================
-
-/**
- * Calculate ring radius based on partner count.
- * More partners = larger ring to avoid overlap.
- */
-function getRingRadius(partnerCount) {
-  const { small, medium, large } = CONFIG.ringRadius;
   
-  if (partnerCount <= small.max) {
-    // Linear interpolation within small range
-    const t = (partnerCount - small.min) / (small.max - small.min + 1);
-    return small.radiusMin + t * (small.radiusMax - small.radiusMin);
-  } else if (partnerCount <= medium.max) {
-    const t = (partnerCount - medium.min) / (medium.max - medium.min + 1);
-    return medium.radiusMin + t * (medium.radiusMax - medium.radiusMin);
-  } else {
-    // Large: cap at max
-    const t = Math.min((partnerCount - large.min) / 5, 1);
-    return large.radiusMin + t * (large.radiusMax - large.radiusMin);
-  }
+  // Extract unique partner names using Set
+  const uniqueNames = new Set();
+  cityData.partners.forEach(p => {
+    const name = (p.name || '').trim();
+    // Filter out empty names and self-partner "Tencent"
+    if (name && name.toLowerCase() !== CONFIG.selfPartnerName) {
+      uniqueNames.add(name);
+    }
+  });
+  
+  // Convert to array and sort alphabetically for deterministic ordering
+  return Array.from(uniqueNames).sort((a, b) => a.localeCompare(b));
 }
 
+// ============================================================================
+// PARTNER RING POSITION CALCULATION
+// ============================================================================
+
+/** Fixed ring radius in degrees */
+const RING_RADIUS_DEG = 4.0;
+
 /**
- * Position partners in a ring around the POP.
- * Applies:
- * - Dynamic radius based on partner count
- * - cos(lat) correction for longitude
- * - Latitude clamp to avoid poles
+ * Compute partner positions in a ring around the POP.
+ * 
+ * Algorithm:
+ * - N partners are evenly distributed around a circle
+ * - Ring radius = 1.2 degrees (fixed)
+ * - Longitude offset corrected by cos(latitude) to maintain circular appearance
+ * - Latitude clamped to avoid pole distortion
+ * 
+ * @param {number} popLat - POP latitude
+ * @param {number} popLng - POP longitude
+ * @param {string[]} partnerNames - Sorted array of unique partner names
+ * @returns {Array<{name: string, lat: number, lng: number}>} - Partners with computed positions
  */
-function positionPartnersInRing(popLat, popLng, partners) {
-  const count = partners.length;
+function computePartnerRing(popLat, popLng, partnerNames) {
+  const count = partnerNames.length;
   if (count === 0) return [];
-
-  const baseRadius = getRingRadius(count);
-  const angleStep = (2 * Math.PI) / count;
-
-  return partners.map((partner, index) => {
-    const angle = angleStep * index - Math.PI / 2; // Start from top
+  
+  const popLatRad = popLat * Math.PI / 180;
+  const cosLat = Math.cos(popLatRad);
+  
+  // Avoid division by zero near poles
+  const lngCorrectionFactor = cosLat > 0.1 ? 1 / cosLat : 10;
+  // Cap correction to avoid extreme stretching
+  const cappedLngCorrection = Math.min(lngCorrectionFactor, 5);
+  
+  return partnerNames.map((name, index) => {
+    // Evenly distribute angles, starting from top (north)
+    const angle = (2 * Math.PI * index) / count - Math.PI / 2;
     
-    // Apply cos(lat) correction for longitude to maintain circular appearance
-    const cosLat = Math.cos(popLat * Math.PI / 180);
-    const lngCorrection = cosLat > 0.1 ? 1 / cosLat : 10; // Avoid division issues near poles
+    // Calculate offsets
+    const latOffsetDeg = RING_RADIUS_DEG * Math.sin(angle);
+    const lngOffsetDeg = (RING_RADIUS_DEG * Math.cos(angle)) * cappedLngCorrection;
     
-    let newLat = popLat + baseRadius * Math.sin(angle);
-    let newLng = popLng + baseRadius * Math.cos(angle) * Math.min(lngCorrection, 3);
+    // Compute final position
+    let partnerLat = popLat + latOffsetDeg;
+    let partnerLng = popLng + lngOffsetDeg;
     
     // Clamp latitude to avoid pole issues
-    newLat = Math.max(-CONFIG.maxLatitudeOffset, Math.min(CONFIG.maxLatitudeOffset, newLat));
+    partnerLat = Math.max(-CONFIG.maxLatitudeOffset, Math.min(CONFIG.maxLatitudeOffset, partnerLat));
     
     return {
-      ...partner,
-      lat: newLat,
-      lng: newLng,
-      originalLat: partner.lat,
-      originalLng: partner.lng
+      name,
+      lat: partnerLat,
+      lng: partnerLng
     };
   });
+}
+
+// ============================================================================
+// BUILD PARTNER POINTS AND ARCS
+// ============================================================================
+
+/**
+ * Build partner dots and arcs for all POPs.
+ * 
+ * For each POP:
+ * 1. Normalize partners (de-dup, filter Tencent, sort alphabetically)
+ * 2. Compute ring positions (ignore JSON lat/lng, use ring math)
+ * 3. Generate partner dots at computed positions
+ * 4. Generate arcs from POP center to each partner dot
+ * 
+ * @param {Object} peeringData - Full peering data from JSON
+ * @returns {{partnerDots: Array, partnerLabels: Array, localArcs: Array, popPoints: Array, popsByRegion: Object}}
+ */
+function buildPartnerPointsAndArcs(peeringData) {
+  const popPoints = [];
+  const partnerDots = [];
+  const partnerLabels = [];
+  const localArcs = [];
+  const popsByRegion = { APAC: [], EMEA: [], NA: [], LATAM: [] };
+  
+  peeringData.partners.forEach(cityData => {
+    const popLat = cityData.riotLat;
+    const popLng = cityData.riotLng;
+    const city = cityData.city;
+    const region = assignRegion(popLat, popLng);
+    
+    // Step 1: Normalize partners (de-dup + sort)
+    const uniquePartnerNames = normalizePartners(cityData);
+    
+    // Step 2: Compute ring positions
+    const positionedPartners = computePartnerRing(popLat, popLng, uniquePartnerNames);
+    
+    // Create POP point
+    const popPoint = {
+      lat: popLat,
+      lng: popLng,
+      city: city,
+      region: region,
+      type: 'pop',
+      partnerCount: uniquePartnerNames.length
+    };
+    popPoints.push(popPoint);
+    
+    if (popsByRegion[region]) {
+      popsByRegion[region].push(popPoint);
+    }
+    
+    // Step 3 & 4: Generate partner dots and arcs
+    positionedPartners.forEach(partner => {
+      // Partner anchor dot
+      partnerDots.push({
+        lat: partner.lat,
+        lng: partner.lng,
+        name: partner.name,
+        city: city,
+        type: 'partnerDot'
+      });
+      
+      // Partner label
+      partnerLabels.push({
+        lat: partner.lat,
+        lng: partner.lng,
+        name: partner.name,
+        city: city,
+        type: 'partner'
+      });
+      
+      // Calculate distance for arc visual properties
+      const distance = haversineDistance(popLat, popLng, partner.lat, partner.lng);
+      
+      // Arc from POP center → partner dot
+      localArcs.push({
+        startLat: popLat,
+        startLng: popLng,
+        endLat: partner.lat,
+        endLng: partner.lng,
+        city: city,
+        partner: partner.name,
+        type: 'local',
+        distance: distance
+      });
+    });
+  });
+  
+  return {
+    popPoints,
+    partnerDots,
+    partnerLabels,
+    localArcs,
+    popsByRegion
+  };
 }
 
 // ============================================================================
@@ -290,82 +389,14 @@ function processData(riotData, partnerData) {
     type: 'riot'
   }));
 
-  // 2. Process Tencent POPs and partners
-  const popPoints = [];
-  const partnerLabels = [];
-  const partnerDots = [];
-  const localArcs = [];
-  const popsByRegion = { APAC: [], EMEA: [], NA: [], LATAM: [] };
-
-  let filteredArcCount = 0;
-
-  partnerData.partners.forEach(cityData => {
-    const popLat = cityData.riotLat;
-    const popLng = cityData.riotLng;
-    const region = assignRegion(popLat, popLng);
-
-    const popPoint = {
-      lat: popLat,
-      lng: popLng,
-      city: cityData.city,
-      region: region,
-      type: 'pop',
-      partnerCount: cityData.partners.length
-    };
-
-    popPoints.push(popPoint);
-
-    if (popsByRegion[region]) {
-      popsByRegion[region].push(popPoint);
-    }
-
-    // Filter and position partners
-    const validPartners = cityData.partners.filter(partner => {
-      const shouldFilter = shouldFilterArc(
-        partner.name, popLat, popLng, partner.lat, partner.lng
-      );
-      if (shouldFilter) filteredArcCount++;
-      return !shouldFilter;
-    });
-
-    // Position partners in a ring around the POP
-    const positionedPartners = positionPartnersInRing(popLat, popLng, validPartners);
-
-    positionedPartners.forEach(partner => {
-      // Partner label
-      partnerLabels.push({
-        lat: partner.lat,
-        lng: partner.lng,
-        name: partner.name,
-        city: cityData.city,
-        type: 'partner'
-      });
-
-      // Partner anchor dot (small visual marker)
-      partnerDots.push({
-        lat: partner.lat,
-        lng: partner.lng,
-        name: partner.name,
-        city: cityData.city,
-        type: 'partnerDot'
-      });
-
-      // Calculate distance for arc properties
-      const distance = haversineDistance(popLat, popLng, partner.lat, partner.lng);
-
-      // Local fan-out arc
-      localArcs.push({
-        startLat: popLat,
-        startLng: popLng,
-        endLat: partner.lat,
-        endLng: partner.lng,
-        city: cityData.city,
-        partner: partner.name,
-        type: 'local',
-        distance: distance
-      });
-    });
-  });
+  // 2. Process Tencent POPs and partners using the new deterministic logic
+  const {
+    popPoints,
+    partnerDots,
+    partnerLabels,
+    localArcs,
+    popsByRegion
+  } = buildPartnerPointsAndArcs(partnerData);
 
   // 3. Resolve regional hubs
   const hubs = {};
@@ -420,8 +451,7 @@ function processData(riotData, partnerData) {
     localArcs,
     backboneArcs,
     hubs,
-    popsByRegion,
-    filteredArcCount
+    popsByRegion
   };
 }
 
@@ -444,8 +474,7 @@ const {
   localArcs,
   backboneArcs,
   hubs,
-  popsByRegion,
-  filteredArcCount
+  popsByRegion
 } = processData(riotLocations, peeringData);
 
 const globe = Globe()
@@ -597,7 +626,7 @@ globe
   .arcStartLng('startLng')
   .arcEndLat('endLat')
   .arcEndLng('endLng')
-  .arcColor(d => d.type === 'backbone' ? CONFIG.backboneArcColors : CONFIG.localArcColors)
+  .arcColor(d => d.type === 'backbone' ? CONFIG.backboneArcColors : CONFIG.backboneArcColors)
   .arcAltitude(d => {
     if (d.type === 'backbone') return CONFIG.backboneArcAltitude;
     return getLocalArcAltitude(d.distance || 100);
@@ -701,7 +730,6 @@ if (import.meta.env.DEV) {
     partners: partnerLabels.length,
     localArcs: localArcs.length,
     backboneArcs: backboneArcs.length,
-    filteredArcs: filteredArcCount,
     hubs: Object.entries(hubs).map(([r, h]) => `${r}: ${h?.city || 'none'}`).join(', '),
     animationEnabled: CONFIG.ENABLE_ANIMATION
   });
