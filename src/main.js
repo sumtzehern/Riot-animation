@@ -19,6 +19,7 @@ import peeringData from './data/peering.json';
 // CONFIGURATION
 // ============================================================================
 
+// const EARTH_TEXTURE_URL = '//unpkg.com/three-globe/example/img/earth-dark.jpg'
 const EARTH_TEXTURE_URL = '//unpkg.com/three-globe/example/img/earth-night.jpg';
 const EARTH_BUMP_URL = '//unpkg.com/three-globe/example/img/earth-topology.png';
 
