@@ -1,52 +1,334 @@
 {
-  "cities": [
+  "partners": [
     {
       "city": "Hong Kong",
-      "lat": 22.3193,
-      "lng": 114.1694,
-      "partners": ["Telia", "HKBN", "PCCW-TRANSIT", "CMHK-PNI", "Tencent"]
+      "riotLat": 22.3193,
+      "riotLng": 114.1694,
+      "partners": [
+        { "name": "Tencent", "lat": 22.3293, "lng": 114.1694 },
+        { "name": "HKBN", "lat": 22.3264, "lng": 114.1867 },
+        { "name": "PCCW", "lat": 22.3122, "lng": 114.1980 },
+        { "name": "CMHK", "lat": 22.3022, "lng": 114.1867 },
+        { "name": "NTT", "lat": 22.3093, "lng": 114.1694 },
+        { "name": "Equinix", "lat": 22.3122, "lng": 114.1408 },
+        { "name": "HKIX", "lat": 22.3264, "lng": 114.1521 }
+      ]
+    },
+    {
+      "city": "Bangkok",
+      "riotLat": 13.7563,
+      "riotLng": 100.5018,
+      "partners": [
+        { "name": "True", "lat": 13.7663, "lng": 100.5018 },
+        { "name": "TOT", "lat": 13.7613, "lng": 100.5191 }
+      ]
+    },
+    {
+      "city": "Seongnam",
+      "riotLat": 37.4449,
+      "riotLng": 127.1389,
+      "partners": [
+        { "name": "KINX", "lat": 37.4549, "lng": 127.1389 },
+        { "name": "KINX", "lat": 37.4499, "lng": 127.1562 }
+      ]
+    },
+    {
+      "city": "Manila",
+      "riotLat": 14.5995,
+      "riotLng": 120.9842,
+      "partners": [
+        { "name": "Zenlayer", "lat": 14.6095, "lng": 120.9842 },
+        { "name": "Globe", "lat": 14.6045, "lng": 121.0015 }
+      ]
     },
     {
       "city": "Tokyo",
-      "lat": 35.6762,
-      "lng": 139.6503,
-      "partners": ["JPIX", "PCCW", "NTT", "Tencent-PNI"]
+      "riotLat": 35.6762,
+      "riotLng": 139.6503,
+      "partners": [
+        { "name": "JPIX", "lat": 35.6862, "lng": 139.6503 },
+        { "name": "PCCW", "lat": 35.6833, "lng": 139.6676 },
+        { "name": "NTT", "lat": 35.6691, "lng": 139.6789 },
+        { "name": "Tencent", "lat": 35.6562, "lng": 139.6503 }
+      ]
     },
     {
-      "city": "Singapore",
-      "lat": 1.3521,
-      "lng": 103.8198,
-      "partners": ["Equinix", "SingTel", "PCCW", "Telia"]
+      "city": "Osaka",
+      "riotLat": 34.6937,
+      "riotLng": 135.5023,
+      "partners": [
+        { "name": "JPIX", "lat": 34.7037, "lng": 135.5023 },
+        { "name": "NTT", "lat": 34.7008, "lng": 135.5196 },
+        { "name": "OCN", "lat": 34.6866, "lng": 135.5309 },
+        { "name": "PCCW", "lat": 34.6737, "lng": 135.5023 }
+      ]
     },
     {
       "city": "Los Angeles",
-      "lat": 34.0522,
-      "lng": -118.2437,
-      "partners": ["Cogent", "Level3", "GTT", "Zayo", "Hurricane Electric"]
+      "riotLat": 34.0522,
+      "riotLng": -118.2437,
+      "partners": [
+        { "name": "Telia", "lat": 34.0622, "lng": -118.2437 },
+        { "name": "Lumen", "lat": 34.0593, "lng": -118.2264 },
+        { "name": "Any2", "lat": 34.0451, "lng": -118.2151 },
+        { "name": "Tencent", "lat": 34.0322, "lng": -118.2437 }
+      ]
+    },
+    {
+      "city": "Miami",
+      "riotLat": 25.7617,
+      "riotLng": -80.1918,
+      "partners": [
+        { "name": "Lumen", "lat": 25.7717, "lng": -80.1918 },
+        { "name": "Telia", "lat": 25.7688, "lng": -80.1745 },
+        { "name": "FLO", "lat": 25.7546, "lng": -80.1632 }
+      ]
+    },
+    {
+      "city": "Ashburn",
+      "riotLat": 39.0438,
+      "riotLng": -77.4874,
+      "partners": [
+        { "name": "Telia", "lat": 39.0538, "lng": -77.4874 },
+        { "name": "Equinix", "lat": 39.0509, "lng": -77.4701 },
+        { "name": "Tencent", "lat": 39.0367, "lng": -77.4588 },
+        { "name": "Level3", "lat": 39.0238, "lng": -77.4874 }
+      ]
+    },
+    {
+      "city": "New York",
+      "riotLat": 40.7128,
+      "riotLng": -74.0060,
+      "partners": [
+        { "name": "Level3", "lat": 40.7228, "lng": -74.0060 },
+        { "name": "Telia", "lat": 40.7199, "lng": -73.9887 }
+      ]
+    },
+    {
+      "city": "Istanbul",
+      "riotLat": 41.0082,
+      "riotLng": 28.9784,
+      "partners": [
+        { "name": "DE-CIX", "lat": 41.0182, "lng": 28.9784 },
+        { "name": "TurkTelekom", "lat": 41.0153, "lng": 28.9957 },
+        { "name": "IQNetworks", "lat": 41.0011, "lng": 29.0070 },
+        { "name": "Vodafone", "lat": 40.9882, "lng": 28.9784 }
+      ]
+    },
+    {
+      "city": "Sao Paulo",
+      "riotLat": -23.5558,
+      "riotLng": -46.6396,
+      "partners": [
+        { "name": "Lumen", "lat": -23.5458, "lng": -46.6396 },
+        { "name": "IXBR", "lat": -23.5487, "lng": -46.6223 },
+        { "name": "Telxius", "lat": -23.5629, "lng": -46.6110 },
+        { "name": "ALOO", "lat": -23.5758, "lng": -46.6396 },
+        { "name": "InterNexa", "lat": -23.5687, "lng": -46.6569 }
+      ]
     },
     {
       "city": "Frankfurt",
-      "lat": 50.1109,
-      "lng": 8.6821,
-      "partners": ["DE-CIX", "Telia", "Cogent", "GTT"]
+      "riotLat": 50.1109,
+      "riotLng": 8.6821,
+      "partners": [
+        { "name": "Telia", "lat": 50.1209, "lng": 8.6821 },
+        { "name": "OTEGLOBE", "lat": 50.1180, "lng": 8.6994 },
+        { "name": "Level3", "lat": 50.1038, "lng": 8.7107 },
+        { "name": "DE-CIX", "lat": 50.0909, "lng": 8.6821 },
+        { "name": "IQNetworks", "lat": 50.0979, "lng": 8.6648 },
+        { "name": "Tencent", "lat": 50.1180, "lng": 8.6648 }
+      ]
+    },
+    {
+      "city": "Buenos Aires",
+      "riotLat": -34.6037,
+      "riotLng": -58.3816,
+      "partners": [
+        { "name": "Level3", "lat": -34.5937, "lng": -58.3816 },
+        { "name": "InterNexa", "lat": -34.5966, "lng": -58.3643 },
+        { "name": "Telecentro", "lat": -34.6108, "lng": -58.3530 },
+        { "name": "TelecomArgentina", "lat": -34.6237, "lng": -58.3816 },
+        { "name": "CABASE", "lat": -34.6166, "lng": -58.3989 }
+      ]
+    },
+    {
+      "city": "Giza",
+      "riotLat": 30.0131,
+      "riotLng": 31.2089,
+      "partners": [
+        { "name": "TelecomEgypt", "lat": 30.0231, "lng": 31.2089 },
+        { "name": "EGIX", "lat": 30.0202, "lng": 31.2262 }
+      ]
+    },
+    {
+      "city": "Fujairah",
+      "riotLat": 25.1288,
+      "riotLng": 56.3265,
+      "partners": [
+        { "name": "Etisalat", "lat": 25.1388, "lng": 56.3265 }
+      ]
+    },
+    {
+      "city": "Dubai",
+      "riotLat": 25.2048,
+      "riotLng": 55.2708,
+      "partners": [
+        { "name": "UAE-IX", "lat": 25.2148, "lng": 55.2708 }
+      ]
+    },
+    {
+      "city": "Amsterdam",
+      "riotLat": 52.3676,
+      "riotLng": 4.9041,
+      "partners": [
+        { "name": "Level3", "lat": 52.3776, "lng": 4.9041 },
+        { "name": "NL-IX", "lat": 52.3747, "lng": 4.9214 },
+        { "name": "RETN", "lat": 52.3605, "lng": 4.9327 },
+        { "name": "Telia", "lat": 52.3476, "lng": 4.9041 }
+      ]
+    },
+    {
+      "city": "Cota",
+      "riotLat": 4.8087,
+      "riotLng": -74.1090,
+      "partners": [
+        { "name": "Level3", "lat": 4.8187, "lng": -74.1090 },
+        { "name": "PIT", "lat": 4.8158, "lng": -74.0917 }
+      ]
+    },
+    {
+      "city": "Cyberjaya",
+      "riotLat": 2.9207,
+      "riotLng": 101.6556,
+      "partners": [
+        { "name": "TM", "lat": 2.9307, "lng": 101.6556 },
+        { "name": "MYIX", "lat": 2.9278, "lng": 101.6729 }
+      ]
+    },
+    {
+      "city": "Lima",
+      "riotLat": -12.0464,
+      "riotLng": -77.0428,
+      "partners": [
+        { "name": "Level3", "lat": -12.0364, "lng": -77.0428 },
+        { "name": "PeruIX", "lat": -12.0393, "lng": -77.0255 }
+      ]
+    },
+    {
+      "city": "Santiago",
+      "riotLat": -33.4489,
+      "riotLng": -70.6693,
+      "partners": [
+        { "name": "Level3", "lat": -33.4389, "lng": -70.6693 },
+        { "name": "PIT", "lat": -33.4418, "lng": -70.6520 }
+      ]
+    },
+    {
+      "city": "Paris",
+      "riotLat": 48.8566,
+      "riotLng": 2.3522,
+      "partners": [
+        { "name": "Telia", "lat": 48.8666, "lng": 2.3522 }
+      ]
+    },
+    {
+      "city": "Madrid",
+      "riotLat": 40.4168,
+      "riotLng": -3.7038,
+      "partners": [
+        { "name": "Level3", "lat": 40.4268, "lng": -3.7038 },
+        { "name": "RETN", "lat": 40.4239, "lng": -3.6865 }
+      ]
+    },
+    {
+      "city": "Jeddah",
+      "riotLat": 21.4858,
+      "riotLng": 39.1925,
+      "partners": [
+        { "name": "JEDIX", "lat": 21.4958, "lng": 39.1925 }
+      ]
+    },
+    {
+      "city": "Mexico City",
+      "riotLat": 19.4326,
+      "riotLng": -99.1332,
+      "partners": [
+        { "name": "FLO", "lat": 19.4426, "lng": -99.1332 }
+      ]
+    },
+    {
+      "city": "Singapore",
+      "riotLat": 1.3521,
+      "riotLng": 103.8198,
+      "partners": [
+        { "name": "Tencent", "lat": 1.3621, "lng": 103.8198 },
+        { "name": "Singtel", "lat": 1.3592, "lng": 103.8371 },
+        { "name": "PCCW", "lat": 1.3450, "lng": 103.8484 },
+        { "name": "Equinix", "lat": 1.3321, "lng": 103.8198 },
+        { "name": "SGIX", "lat": 1.3392, "lng": 103.8025 },
+        { "name": "NTT", "lat": 1.3592, "lng": 103.8025 }
+      ]
+    },
+    {
+      "city": "Ho Chi Minh City",
+      "riotLat": 10.8231,
+      "riotLng": 106.6297,
+      "partners": [
+        { "name": "HGC", "lat": 10.8331, "lng": 106.6297 }
+      ]
+    },
+    {
+      "city": "Johannesburg",
+      "riotLat": -26.2041,
+      "riotLng": 28.0473,
+      "partners": [
+        { "name": "NAPAfricaIX", "lat": -26.1941, "lng": 28.0473 }
+      ]
+    },
+    {
+      "city": "Barka",
+      "riotLat": 23.6787,
+      "riotLng": 57.8870,
+      "partners": [
+        { "name": "Omantel", "lat": 23.6887, "lng": 57.8870 },
+        { "name": "Cybernet", "lat": 23.6858, "lng": 57.9043 }
+      ]
     },
     {
       "city": "Sydney",
-      "lat": -33.8688,
-      "lng": 151.2093,
-      "partners": ["Equinix", "Telstra", "PIPE Networks"]
+      "riotLat": -33.8688,
+      "riotLng": 151.2093,
+      "partners": [
+        { "name": "NSW-IXP", "lat": -33.8588, "lng": 151.2093 },
+        { "name": "TPG", "lat": -33.8617, "lng": 151.2266 }
+      ]
     },
     {
-      "city": "São Paulo",
-      "lat": -23.5505,
-      "lng": -46.6333,
-      "partners": ["IX.br", "Telefonica", "Claro", "Lumen"]
+      "city": "Doha",
+      "riotLat": 25.2854,
+      "riotLng": 51.5310,
+      "partners": [
+        { "name": "Ooredoo", "lat": 25.2954, "lng": 51.5310 }
+      ]
     },
     {
-      "city": "Seoul",
-      "lat": 37.5665,
-      "lng": 126.9780,
-      "partners": ["KINX", "KT", "SKB", "LG Uplus"]
+      "city": "Phnom Penh",
+      "riotLat": 11.5564,
+      "riotLng": 104.9282,
+      "partners": [
+        { "name": "MekongNet", "lat": 11.5664, "lng": 104.9282 },
+        { "name": "CNX", "lat": 11.5635, "lng": 104.9455 }
+      ]
+    },
+    {
+      "city": "London",
+      "riotLat": 51.5074,
+      "riotLng": -0.1278,
+      "partners": [
+        { "name": "Telia", "lat": 51.5174, "lng": -0.1278 },
+        { "name": "LINX", "lat": 51.5145, "lng": -0.1105 }
+      ]
     }
   ]
 }

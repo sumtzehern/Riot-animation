@@ -1,144 +1,118 @@
 /**
  * RIOT Games Peering Coverage Globe
- * 3D visualization of peering partners across global data centers
+ * Red dots: RIOT locations, Blue dots: Partners, White labels: City names
  */
 
 import Globe from 'globe.gl';
+import riotLocations from './data/riot-locations.json';
 import peeringData from './data/peering.json';
 
-// ============================================================================
-// CONFIGURATION - Easy to modify
-// ============================================================================
-
-// Earth texture URL - replace with your own if needed
-// const EARTH_TEXTURE_URL = '//unpkg.com/three-globe/example/img/earth-blue-marble.jpg'; // Blue marble texture
-const EARTH_TEXTURE_URL = '//unpkg.com/three-globe/example/img/earth-dark.jpg';
+// Earth texture URL
+const EARTH_TEXTURE_URL = '//unpkg.com/three-globe/example/img/earth-night.jpg';
 const EARTH_BUMP_URL = '//unpkg.com/three-globe/example/img/earth-topology.png';
 
 // Visual settings
 const CONFIG = {
-  // Globe
-  globeRotationSpeed: 0.0003,      // Auto-rotation speed (radians per frame)
+  // RIOT locations (red dots)
+  riotPinColor: '#ff4646',
+  riotPinAltitude: 0.02,
+  riotPinRadius: 1.2,
   
-  // City pins
-  cityPinColor: '#ff4646',         // Red color for RIOT cities
-  cityPinAltitude: 0.01,           // Height above globe surface
-  cityPinRadius: 0.4,              // Pin size
+  // Partner locations (Tencent PoPs - blue dots)
+  partnerPinColor: '#3458b0',
+  partnerPinAltitude: 0.02,
+  partnerPinRadius: 0.8,
   
-  // Partner labels
-  partnerRingRadius: 1.5,          // Distance from city (in degrees)
-  partnerLabelAltitude: 0.02,      // Height above globe
-  
+  // City labels (white text) - positioned at RIOT locations
+  cityLabelColor: '#ffffff',
+  cityLabelAltitude: 0.04,  // Higher than pins so they're visible
+  cityLabelSize: 1.2,
+
   // Arcs
-  arcColor: ['#ff4646', '#4ecdc4'], // Gradient from city (red) to partner (teal)
-  arcAltitude: 0.12,               // Arc height
-  arcDashLength: 0.4,              // Length of dash segments
-  arcDashGap: 0.2,                 // Gap between dashes
-  arcDashAnimateTime: 2000,        // Animation duration (ms)
-  arcStroke: 0.5,                  // Arc thickness
-  
+  arcColor: ['#ff4646', '#3458b0'],
+  arcAltitude: 0.12,
+  arcDashLength: 0.4,
+  arcDashGap: 4,
+  arcDashAnimateTime: 1100,
+  arcStroke: 1.0,
+
   // Camera
-  cameraFlyDuration: 1500,         // Click-to-fly animation duration (ms)
-  initialAltitude: 2.5,            // Initial camera distance
+  initialAltitude: 2.4,
+  cameraFlyDuration: 1500,
+
+  // Auto rotate
+  autoRotateSpeed: 0.6
 };
 
-// ============================================================================
-// DATA PROCESSING
-// ============================================================================
+// ----------------------------
+// Data processing
+// ----------------------------
 
-/**
- * Calculate partner label positions arranged in a ring around the city
- * @param {Object} city - City data with lat, lng, partners
- * @returns {Array} Partner positions with lat, lng, name
- */
-function calculatePartnerPositions(city) {
-  const partners = city.partners || [];
-  const numPartners = partners.length;
-  
-  if (numPartners === 0) return [];
-  
-  return partners.map((partner, index) => {
-    // Spread partners evenly in a circle
-    const angle = (2 * Math.PI * index) / numPartners;
-    
-    // Calculate offset - correct longitude by cos(lat) for spherical distortion
-    const latRad = (city.lat * Math.PI) / 180;
-    const latOffset = CONFIG.partnerRingRadius * Math.sin(angle);
-    const lngOffset = (CONFIG.partnerRingRadius * Math.cos(angle)) / Math.cos(latRad);
-    
-    return {
-      lat: city.lat + latOffset,
-      lng: city.lng + lngOffset,
-      name: partner,
-      city: city.city
-    };
-  });
-}
-
-/**
- * Generate arc data connecting cities to their partners
- * @param {Object} city - City data
- * @param {Array} partnerPositions - Calculated partner positions
- * @returns {Array} Arc objects for globe.gl
- */
-function generateArcs(city, partnerPositions) {
-  return partnerPositions.map(partner => ({
-    startLat: city.lat,
-    startLng: city.lng,
-    endLat: partner.lat,
-    endLng: partner.lng,
-    city: city.city,
-    partner: partner.name
+function processData(riotData, partnerData) {
+  // Process RIOT locations (red dots)
+  const riotPoints = riotData.locations.map(location => ({
+    lat: location.lat,
+    lng: location.lng,
+    name: location.city,
+    region: location.region,
+    type: 'riot'
   }));
-}
 
-/**
- * Process raw peering data into globe-ready format
- * @param {Object} data - Raw peering.json data
- * @returns {Object} Processed data for cities, partners, and arcs
- */
-function processData(data) {
-  const cities = data.cities || [];
-  const allPartners = [];
-  const allArcs = [];
-  
-  cities.forEach(city => {
-    const partnerPositions = calculatePartnerPositions(city);
-    allPartners.push(...partnerPositions);
-    allArcs.push(...generateArcs(city, partnerPositions));
+  // Process partner locations (blue dots) and arcs
+  const partnerPoints = [];
+  const arcs = [];
+
+  partnerData.partners.forEach(cityData => {
+    // Add partner points (blue dots) and arcs
+    cityData.partners.forEach(partner => {
+      partnerPoints.push({
+        lat: partner.lat,
+        lng: partner.lng,
+        name: partner.name,
+        city: cityData.city,
+        type: 'partner'
+      });
+
+      // Create arc from RIOT location to partner
+      arcs.push({
+        startLat: cityData.riotLat,
+        startLng: cityData.riotLng,
+        endLat: partner.lat,
+        endLng: partner.lng,
+        city: cityData.city,
+        partner: partner.name
+      });
+    });
   });
-  
+
+  // Create city labels positioned at RIOT locations (not partner locations)
+  const cityLabels = riotPoints.map(riotPoint => ({
+    lat: riotPoint.lat,
+    lng: riotPoint.lng,
+    name: riotPoint.name,
+    type: 'cityLabel'
+  }));
+
   return {
-    cities: cities.map(c => ({
-      lat: c.lat,
-      lng: c.lng,
-      name: c.city,
-      size: CONFIG.cityPinRadius,
-      color: CONFIG.cityPinColor
-    })),
-    partners: allPartners,
-    arcs: allArcs
+    riotPoints,
+    partnerPoints,
+    cityLabels,
+    arcs
   };
 }
 
-// ============================================================================
-// GLOBE INITIALIZATION
-// ============================================================================
+// ----------------------------
+// Init
+// ----------------------------
 
-// Get DOM elements
 const container = document.getElementById('globe-container');
 const tooltip = document.getElementById('tooltip');
 
-// Validate container exists
-if (!container) {
-  console.error('Globe container not found!');
-  throw new Error('Globe container element #globe-container not found');
-}
+if (!container) throw new Error('Missing #globe-container in index.html');
+if (!tooltip) throw new Error('Missing #tooltip in index.html');
 
-// Process the peering data
-const { cities, partners, arcs } = processData(peeringData);
+const { riotPoints, partnerPoints, cityLabels, arcs } = processData(riotLocations, peeringData);
 
-// Initialize the globe
 const globe = Globe()
   .globeImageUrl(EARTH_TEXTURE_URL)
   .bumpImageUrl(EARTH_BUMP_URL)
@@ -149,46 +123,104 @@ const globe = Globe()
   .width(window.innerWidth)
   .height(window.innerHeight);
 
-// Mount globe to container
 globe(container);
 
 // Set initial camera position
-globe.pointOfView({ lat: 30, lng: 120, altitude: CONFIG.initialAltitude });
+globe.pointOfView({ lat: 30, lng: 120, altitude: CONFIG.initialAltitude }, 0);
 
-// ============================================================================
-// CITY POINTS (Red Pins)
-// ============================================================================
+// IMPORTANT: Use built in auto rotate (do not do manual POV update loop)
+const controls = globe.controls();
+controls.autoRotate = true;
+controls.autoRotateSpeed = CONFIG.autoRotateSpeed;
+
+// ----------------------------
+// Tooltip mouse tracking
+// ----------------------------
+
+let mouse = { x: 0, y: 0 };
+document.addEventListener('mousemove', (e) => {
+  mouse.x = e.clientX;
+  mouse.y = e.clientY;
+
+  if (tooltip.classList.contains('visible')) {
+    tooltip.style.left = `${mouse.x + 15}px`;
+    tooltip.style.top = `${mouse.y + 15}px`;
+  }
+});
+
+function showTooltip(html) {
+  tooltip.innerHTML = html;
+  tooltip.classList.add('visible');
+  tooltip.style.left = `${mouse.x + 15}px`;
+  tooltip.style.top = `${mouse.y + 15}px`;
+}
+
+function hideTooltip() {
+  tooltip.classList.remove('visible');
+}
+
+// ----------------------------
+// All points (red RIOT dots + blue partner dots)
+// ----------------------------
+
+// Combine all points data with type indicators
+const allPoints = [
+  ...riotPoints.map(p => ({ ...p, type: 'riot' })),
+  ...partnerPoints.map(p => ({ ...p, type: 'partner' }))
+];
 
 globe
-  .pointsData(cities)
+  .pointsData(allPoints)
   .pointLat('lat')
   .pointLng('lng')
-  .pointAltitude(CONFIG.cityPinAltitude)
-  .pointRadius('size')
-  .pointColor('color')
-  .pointLabel(d => `<div class="city-label">${d.name}</div>`)
-  .onPointClick(handleCityClick)
-  .onPointHover(handleCityHover);
+  .pointAltitude(d => d.type === 'riot' ? CONFIG.riotPinAltitude : CONFIG.partnerPinAltitude)
+  .pointRadius(d => d.type === 'riot' ? CONFIG.riotPinRadius : CONFIG.partnerPinRadius)
+  .pointColor(d => d.type === 'riot' ? CONFIG.riotPinColor : CONFIG.partnerPinColor)
+  .onPointClick((point) => {
+    if (point && point.type === 'riot') {
+      handleRiotClick(point);
+    }
+  })
+  .onPointHover((point) => {
+    if (point) {
+      if (point.type === 'riot') {
+        showTooltip(`
+          <div class="riot-tooltip">
+            <strong>RIOT Games</strong><br>
+            ${point.name}<br>
+            <small>Region: ${point.region}</small>
+          </div>
+        `);
+      } else {
+        showTooltip(`
+          <div class="partner-tooltip">
+            <strong>Partner:</strong> ${point.name}<br>
+            <strong>City:</strong> ${point.city}
+          </div>
+        `);
+      }
+    } else {
+      hideTooltip();
+    }
+  });
 
-// ============================================================================
-// PARTNER LABELS
-// ============================================================================
+// ----------------------------
+// City labels (white text) - positioned at RIOT locations
+// ----------------------------
 
 globe
-  .labelsData(partners)
+  .labelsData(cityLabels)
   .labelLat('lat')
   .labelLng('lng')
   .labelText('name')
-  .labelSize(0.5)
-  .labelDotRadius(0.15)
-  .labelColor(() => '#4ecdc4')
-  .labelAltitude(CONFIG.partnerLabelAltitude)
-  .labelResolution(2)
-  .onLabelHover(handlePartnerHover);
+  .labelSize(CONFIG.cityLabelSize)
+  .labelColor(() => CONFIG.cityLabelColor)
+  .labelAltitude(CONFIG.cityLabelAltitude)
+  .labelResolution(2);
 
-// ============================================================================
-// ANIMATED ARCS
-// ============================================================================
+// ----------------------------
+// Arcs (connections from RIOT to partners)
+// ----------------------------
 
 globe
   .arcsData(arcs)
@@ -201,155 +233,65 @@ globe
   .arcStroke(CONFIG.arcStroke)
   .arcDashLength(CONFIG.arcDashLength)
   .arcDashGap(CONFIG.arcDashGap)
+  .arcDashInitialGap(() => Math.random() * CONFIG.arcDashGap)
   .arcDashAnimateTime(CONFIG.arcDashAnimateTime)
-  .onArcHover(handleArcHover);
+  .onArcHover((arc) => {
+    if (arc) {
+      showTooltip(`
+        <div class="arc-tooltip">
+          <strong>${arc.city}</strong> → <strong>${arc.partner}</strong>
+        </div>
+      `);
+    } else {
+      hideTooltip();
+    }
+  });
 
-// ============================================================================
-// INTERACTION HANDLERS
-// ============================================================================
+// ----------------------------
+// Click handlers and interactions
+// ----------------------------
 
-/**
- * Handle city pin click - fly camera to focus on city
- */
-function handleCityClick(city) {
-  if (!city) return;
-  
+function handleRiotClick(riotPoint) {
+  if (!riotPoint) return;
   globe.pointOfView(
-    { lat: city.lat, lng: city.lng, altitude: 1.0 },
+    { lat: riotPoint.lat, lng: riotPoint.lng, altitude: 1.0 },
     CONFIG.cameraFlyDuration
   );
 }
 
-/**
- * Handle city pin hover
- */
-function handleCityHover(city, prevCity) {
-  if (city) {
-    showTooltip(`<span class="city-name">${city.name}</span>`, event);
-  } else {
-    hideTooltip();
-  }
-}
+// Pause auto rotate while user interacts, resume after idle
+let idleTimer = null;
 
-/**
- * Handle partner label hover
- */
-function handlePartnerHover(partner, prevPartner) {
-  if (partner) {
-    showTooltip(
-      `City: <span class="city-name">${partner.city}</span> | ` +
-      `Partner: <span class="partner-name">${partner.name}</span>`,
-      event
-    );
-  } else {
-    hideTooltip();
-  }
-}
-
-/**
- * Handle arc hover
- */
-function handleArcHover(arc, prevArc) {
-  if (arc) {
-    showTooltip(
-      `City: <span class="city-name">${arc.city}</span> | ` +
-      `Partner: <span class="partner-name">${arc.partner}</span>`,
-      event
-    );
-  } else {
-    hideTooltip();
-  }
-}
-
-/**
- * Show tooltip at mouse position
- */
-function showTooltip(html, mouseEvent) {
-  tooltip.innerHTML = html;
-  tooltip.classList.add('visible');
-  
-  // Position tooltip near mouse
-  if (mouseEvent) {
-    const x = mouseEvent.clientX || mouseEvent.pageX || 0;
-    const y = mouseEvent.clientY || mouseEvent.pageY || 0;
-    tooltip.style.left = `${x + 15}px`;
-    tooltip.style.top = `${y + 15}px`;
-  }
-}
-
-/**
- * Hide tooltip
- */
-function hideTooltip() {
-  tooltip.classList.remove('visible');
-}
-
-// Track mouse position for tooltip
-document.addEventListener('mousemove', (e) => {
-  if (tooltip.classList.contains('visible')) {
-    tooltip.style.left = `${e.clientX + 15}px`;
-    tooltip.style.top = `${e.clientY + 15}px`;
-  }
-});
-
-// ============================================================================
-// AUTO-ROTATION
-// ============================================================================
-
-let autoRotate = true;
-
-// Animation loop for auto-rotation
-function animate() {
-  if (autoRotate) {
-    const currentPov = globe.pointOfView();
-    globe.pointOfView({
-      lat: currentPov.lat,
-      lng: currentPov.lng + CONFIG.globeRotationSpeed * 50,
-      altitude: currentPov.altitude
-    });
-  }
-  requestAnimationFrame(animate);
-}
-
-// Start animation
-animate();
-
-// Pause rotation when user interacts with globe
-container.addEventListener('mousedown', () => { autoRotate = false; });
-container.addEventListener('touchstart', () => { autoRotate = false; });
-
-// Resume rotation after inactivity
-let idleTimer;
-function resetIdleTimer() {
+function pauseAutoRotate() {
+  controls.autoRotate = false;
   clearTimeout(idleTimer);
-  idleTimer = setTimeout(() => { autoRotate = true; }, 5000);
 }
 
-container.addEventListener('mouseup', resetIdleTimer);
-container.addEventListener('touchend', resetIdleTimer);
-container.addEventListener('wheel', () => {
-  autoRotate = false;
-  resetIdleTimer();
-});
+function resumeAutoRotateLater() {
+  clearTimeout(idleTimer);
+  idleTimer = setTimeout(() => {
+    controls.autoRotate = true;
+  }, 4000);
+}
 
-// ============================================================================
-// RESPONSIVE HANDLING
-// ============================================================================
+container.addEventListener('mousedown', () => { pauseAutoRotate(); });
+container.addEventListener('touchstart', () => { pauseAutoRotate(); }, { passive: true });
+container.addEventListener('mouseup', () => { resumeAutoRotateLater(); });
+container.addEventListener('touchend', () => { resumeAutoRotateLater(); }, { passive: true });
+container.addEventListener('wheel', () => { pauseAutoRotate(); resumeAutoRotateLater(); }, { passive: true });
 
+// Responsive resize
 window.addEventListener('resize', () => {
   globe.width(window.innerWidth);
   globe.height(window.innerHeight);
 });
 
-// ============================================================================
-// EXPORT FOR DEBUGGING (optional)
-// ============================================================================
-
+// Debug
 if (import.meta.env.DEV) {
-  window.riotGlobe = {
-    globe,
-    data: { cities, partners, arcs },
-    config: CONFIG
+  window.riotGlobe = { 
+    globe, 
+    data: { riotPoints, partnerPoints, cityLabels, arcs }, 
+    config: CONFIG 
   };
-  console.log('RIOT Globe initialized. Access via window.riotGlobe');
+  console.log('RIOT Globe initialized:', { riotPoints: riotPoints.length, partnerPoints: partnerPoints.length, arcs: arcs.length });
 }

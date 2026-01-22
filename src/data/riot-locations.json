@@ -1,0 +1,130 @@
+{
+  "locations": [
+  {
+    "city": "Portland",
+    "lat": 45.5051,
+    "lng": -122.6750,
+    "region": "North America"
+  },
+  {
+    "city": "San Jose",
+    "lat": 37.3382,
+    "lng": -121.8863,
+    "region": "North America"
+  },
+  {
+    "city": "Dallas",
+    "lat": 32.7767,
+    "lng": -96.7970,
+    "region": "North America"
+  },
+  {
+    "city": "Atlanta",
+    "lat": 33.7490,
+    "lng": -84.3880,
+    "region": "North America"
+  },
+  {
+    "city": "Ashburn",
+    "lat": 39.0438,
+    "lng": -77.4874,
+    "region": "North America"
+  },
+  {
+    "city": "Chicago",
+    "lat": 41.8781,
+    "lng": -87.6298,
+    "region": "North America"
+  },
+  {
+    "city": "Mexico City",
+    "lat": 19.4326,
+    "lng": -99.1332,
+    "region": "Latin America"
+  },
+  {
+    "city": "Miami",
+    "lat": 25.7617,
+    "lng": -80.1918,
+    "region": "Latin America"
+  },
+  {
+    "city": "Bogotá",
+    "lat": 4.7110,
+    "lng": -74.0721,
+    "region": "Latin America"
+  },
+  {
+    "city": "Santiago",
+    "lat": -33.4489,
+    "lng": -70.6693,
+    "region": "Latin America"
+  },
+  {
+    "city": "São Paulo",
+    "lat": -23.5505,
+    "lng": -46.6333,
+    "region": "Brazil"
+  },
+  {
+    "city": "Frankfurt",
+    "lat": 50.1109,
+    "lng": 8.6821,
+    "region": "EMEA"
+  },
+  {
+    "city": "Paris",
+    "lat": 48.8566,
+    "lng": 2.3522,
+    "region": "EMEA"
+  },
+  {
+    "city": "London",
+    "lat": 51.5074,
+    "lng": -0.1278,
+    "region": "EMEA"
+  },
+  {
+    "city": "Dubai",
+    "lat": 25.2048,
+    "lng": 55.2708,
+    "region": "EMEA"
+  },
+  {
+    "city": "Cape Town",
+    "lat": -33.9249,
+    "lng": 18.4241,
+    "region": "EMEA"
+  },
+  {
+    "city": "Tokyo",
+    "lat": 35.6762,
+    "lng": 139.6503,
+    "region": "Asia Pacific"
+  },
+  {
+    "city": "Seoul",
+    "lat": 37.5665,
+    "lng": 126.9780,
+    "region": "Asia Pacific"
+  },
+  {
+    "city": "Sydney",
+    "lat": -33.8688,
+    "lng": 151.2093,
+    "region": "Asia Pacific"
+  },
+  {
+    "city": "Singapore",
+    "lat": 1.3521,
+    "lng": 103.8198,
+    "region": "Asia Pacific"
+  },
+  {
+    "city": "Hong Kong",
+    "lat": 22.3193,
+    "lng": 114.1694,
+    "region": "Asia Pacific"
+  }
+]
+}
