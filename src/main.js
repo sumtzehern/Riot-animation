@@ -36,7 +36,7 @@ const CONFIG = {
   // ===== RIOT locations (red pins + city labels) =====
   riotPinColor: '#ff4646',
   riotPinAltitude: 0.02,
-  riotPinRadius: 1.0,
+  riotPinRadius: 0.7,
   riotLabelColor: '#ffffff',
   riotLabelSize: 1.0,
   riotLabelAltitude: 0.03,
@@ -52,7 +52,7 @@ const CONFIG = {
   partnerLabelAltitude: 0.012,
   // Partner anchor dots (small dots at partner positions for visibility)
   partnerDotColor: 'rgba(100, 181, 246, 0.6)',
-  partnerDotRadius: 0.25,
+  partnerDotRadius: 0.40,
   partnerDotAltitude: 0.008,
 
   // ===== Dynamic ring radius for partner positioning =====
@@ -695,6 +695,247 @@ window.addEventListener('resize', () => {
   globe.width(window.innerWidth);
   globe.height(window.innerHeight);
 });
+
+// ============================================================================
+// UI FEATURES: STATS PANEL
+// ============================================================================
+
+function initStatsPanel() {
+  const statPops = document.getElementById('stat-pops');
+  const statPartners = document.getElementById('stat-partners');
+  const statRegions = document.getElementById('stat-regions');
+
+  if (statPops) statPops.textContent = popPoints.length;
+  if (statPartners) statPartners.textContent = partnerLabels.length;
+  if (statRegions) statRegions.textContent = Object.keys(popsByRegion).filter(r => popsByRegion[r].length > 0).length;
+}
+
+initStatsPanel();
+
+// ============================================================================
+// UI FEATURES: REGION FILTER
+// ============================================================================
+
+const regionState = {
+  APAC: true,
+  EMEA: true,
+  NA: true,
+  LATAM: true
+};
+
+function filterDataByRegion() {
+  // Filter points
+  const filteredPoints = [
+    ...riotPoints, // RIOT always visible
+    ...popPoints.filter(p => regionState[p.region]),
+    ...partnerDots.filter(p => {
+      const pop = popPoints.find(pop => pop.city === p.city);
+      return pop && regionState[pop.region];
+    })
+  ];
+
+  // Filter labels
+  const filteredLabels = [
+    ...riotLabels, // RIOT labels always visible
+    ...partnerLabels.filter(p => {
+      const pop = popPoints.find(pop => pop.city === p.city);
+      return pop && regionState[pop.region];
+    })
+  ];
+
+  // Filter arcs
+  const filteredLocalArcs = localArcs.filter(arc => {
+    const pop = popPoints.find(p => p.city === arc.city);
+    return pop && regionState[pop.region];
+  });
+
+  // Backbone arcs: show if both hubs' regions are active
+  const filteredBackboneArcs = backboneArcs.filter(arc => 
+    regionState[arc.fromRegion] && regionState[arc.toRegion]
+  );
+
+  // Update globe
+  globe.pointsData(filteredPoints);
+  globe.labelsData(filteredLabels);
+  globe.arcsData([...filteredLocalArcs, ...filteredBackboneArcs]);
+
+  // Update stats
+  const visiblePops = popPoints.filter(p => regionState[p.region]).length;
+  const visiblePartners = partnerLabels.filter(p => {
+    const pop = popPoints.find(pop => pop.city === p.city);
+    return pop && regionState[pop.region];
+  }).length;
+  const activeRegions = Object.keys(regionState).filter(r => regionState[r] && popsByRegion[r].length > 0).length;
+
+  const statPops = document.getElementById('stat-pops');
+  const statPartners = document.getElementById('stat-partners');
+  const statRegions = document.getElementById('stat-regions');
+
+  if (statPops) statPops.textContent = visiblePops;
+  if (statPartners) statPartners.textContent = visiblePartners;
+  if (statRegions) statRegions.textContent = activeRegions;
+}
+
+function initRegionFilter() {
+  const buttons = document.querySelectorAll('.region-btn');
+  
+  buttons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const region = btn.dataset.region;
+      if (!region) return;
+
+      // Toggle state
+      regionState[region] = !regionState[region];
+      btn.classList.toggle('active', regionState[region]);
+
+      // Update visualization
+      filterDataByRegion();
+    });
+  });
+}
+
+initRegionFilter();
+
+// ============================================================================
+// UI FEATURES: SEARCH BOX
+// ============================================================================
+
+function initSearchBox() {
+  const searchInput = document.getElementById('search-input');
+  const searchResults = document.getElementById('search-results');
+  const searchClear = document.getElementById('search-clear');
+
+  if (!searchInput || !searchResults || !searchClear) return;
+
+  // Build searchable cities list (POPs + RIOT locations)
+  const searchableCities = [
+    ...popPoints.map(p => ({ 
+      name: p.city, 
+      lat: p.lat, 
+      lng: p.lng, 
+      region: p.region, 
+      type: 'pop' 
+    })),
+    ...riotPoints.map(p => ({ 
+      name: p.name, 
+      lat: p.lat, 
+      lng: p.lng, 
+      region: p.region, 
+      type: 'riot' 
+    }))
+  ];
+
+  // Remove duplicates by name
+  const uniqueCities = [];
+  const seen = new Set();
+  searchableCities.forEach(city => {
+    const key = city.name.toLowerCase();
+    if (!seen.has(key)) {
+      seen.add(key);
+      uniqueCities.push(city);
+    }
+  });
+
+  // Sort alphabetically
+  uniqueCities.sort((a, b) => a.name.localeCompare(b.name));
+
+  function performSearch(query) {
+    if (!query || query.length < 1) {
+      searchResults.innerHTML = '';
+      searchResults.classList.remove('active');
+      return;
+    }
+
+    const normalizedQuery = query.toLowerCase().trim();
+    const matches = uniqueCities.filter(city => 
+      city.name.toLowerCase().includes(normalizedQuery)
+    ).slice(0, 8); // Limit to 8 results
+
+    if (matches.length === 0) {
+      searchResults.innerHTML = '<div class="search-no-results">No cities found</div>';
+      searchResults.classList.add('active');
+      return;
+    }
+
+    searchResults.innerHTML = matches.map(city => `
+      <div class="search-result-item" data-lat="${city.lat}" data-lng="${city.lng}" data-name="${city.name}">
+        <span class="city-name">${city.name}</span>
+        <span class="city-region ${city.region.toLowerCase()}">${city.region}</span>
+      </div>
+    `).join('');
+    searchResults.classList.add('active');
+
+    // Add click handlers to results
+    searchResults.querySelectorAll('.search-result-item').forEach(item => {
+      item.addEventListener('click', () => {
+        const lat = parseFloat(item.dataset.lat);
+        const lng = parseFloat(item.dataset.lng);
+        const name = item.dataset.name;
+
+        // Fly to city
+        globe.pointOfView(
+          { lat, lng, altitude: 1.5 },
+          CONFIG.cameraFlyDuration
+        );
+
+        // Update input and close results
+        searchInput.value = name;
+        searchResults.classList.remove('active');
+        searchClear.style.display = 'flex';
+
+        // Pause auto rotate
+        pauseAutoRotate();
+        resumeAutoRotateLater();
+      });
+    });
+  }
+
+  // Input event
+  searchInput.addEventListener('input', (e) => {
+    const query = e.target.value;
+    searchClear.style.display = query.length > 0 ? 'flex' : 'none';
+    performSearch(query);
+  });
+
+  // Focus event
+  searchInput.addEventListener('focus', () => {
+    if (searchInput.value.length > 0) {
+      performSearch(searchInput.value);
+    }
+  });
+
+  // Clear button
+  searchClear.addEventListener('click', () => {
+    searchInput.value = '';
+    searchResults.innerHTML = '';
+    searchResults.classList.remove('active');
+    searchClear.style.display = 'none';
+    searchInput.focus();
+  });
+
+  // Close on click outside
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('#search-container')) {
+      searchResults.classList.remove('active');
+    }
+  });
+
+  // Keyboard navigation
+  searchInput.addEventListener('keydown', (e) => {
+    const items = searchResults.querySelectorAll('.search-result-item');
+    const activeItem = searchResults.querySelector('.search-result-item:hover, .search-result-item.focused');
+    
+    if (e.key === 'Escape') {
+      searchResults.classList.remove('active');
+      searchInput.blur();
+    } else if (e.key === 'Enter' && items.length > 0) {
+      const firstItem = items[0];
+      firstItem.click();
+    }
+  });
+}
+
+initSearchBox();
 
 // ============================================================================
 // DEBUG (Development only)
