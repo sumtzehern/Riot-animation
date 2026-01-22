@@ -14,6 +14,7 @@
 import Globe from 'globe.gl';
 import riotLocations from './data/riot-locations.json';
 import peeringData from './data/peering.json';
+import riotLogoUrl from './data/image/Riot-Games.svg';
 
 // ============================================================================
 // CONFIGURATION
@@ -34,13 +35,13 @@ const CONFIG = {
   // Skip arcs shorter than this distance (km)
   minArcDistanceKm: 15,
 
-  // ===== RIOT locations (red pins + city labels) =====
-  riotPinColor: '#ff4646',
-  riotPinAltitude: 0.02,
-  riotPinRadius: 0.7,
+  // ===== RIOT locations (SVG logo markers + city labels) =====
+  riotLogoSize: 65,                // Logo width/height in pixels
+  riotLogoAltitude: 0.005,         // Very close to globe surface
+  riotLogoGlow: 'rgba(255, 70, 70, 0.9)',  // Red glow color
   riotLabelColor: '#ffffff',
   riotLabelSize: 1.0,
-  riotLabelAltitude: 0.03,
+  riotLabelAltitude: 0.025,        // Above the logo marker
 
   // ===== Tencent POPs (blue pins, no labels) =====
   popPinColor: '#3458b0',
@@ -525,11 +526,10 @@ function hideTooltip() {
 }
 
 // ============================================================================
-// RENDER: POINTS (RIOT + POPs + Partner anchor dots)
+// RENDER: POINTS (POPs + Partner anchor dots) - RIOT rendered separately
 // ============================================================================
 
 const allPoints = [
-  ...riotPoints,
   ...popPoints,
   ...partnerDots
 ];
@@ -539,22 +539,19 @@ globe
   .pointLat('lat')
   .pointLng('lng')
   .pointAltitude(d => {
-    if (d.type === 'riot') return CONFIG.riotPinAltitude;
     if (d.type === 'pop') return CONFIG.popPinAltitude;
     return CONFIG.partnerDotAltitude;
   })
   .pointRadius(d => {
-    if (d.type === 'riot') return CONFIG.riotPinRadius;
     if (d.type === 'pop') return CONFIG.popPinRadius;
     return CONFIG.partnerDotRadius;
   })
   .pointColor(d => {
-    if (d.type === 'riot') return CONFIG.riotPinColor;
     if (d.type === 'pop') return CONFIG.popPinColor;
     return CONFIG.partnerDotColor;
   })
   .onPointClick((point) => {
-    if (point && (point.type === 'riot' || point.type === 'pop')) {
+    if (point && point.type === 'pop') {
       globe.pointOfView(
         { lat: point.lat, lng: point.lng, altitude: 1.2 },
         CONFIG.cameraFlyDuration
@@ -563,15 +560,7 @@ globe
   })
   .onPointHover((point) => {
     if (point) {
-      if (point.type === 'riot') {
-        showTooltip(`
-          <div class="riot-tooltip">
-            <strong>RIOT Games</strong><br>
-            ${point.name}<br>
-            <small>Region: ${point.region}</small>
-          </div>
-        `);
-      } else if (point.type === 'pop') {
+      if (point.type === 'pop') {
         const isHub = Object.values(hubs).some(h => h && h.city === point.city);
         showTooltip(`
           <div class="pop-tooltip">
@@ -591,6 +580,66 @@ globe
     } else {
       hideTooltip();
     }
+  });
+
+// ============================================================================
+// RENDER: RIOT SVG LOGO MARKERS (htmlElementsData layer)
+// ============================================================================
+
+globe
+  .htmlElementsData(riotPoints)
+  .htmlLat('lat')
+  .htmlLng('lng')
+  .htmlAltitude(CONFIG.riotLogoAltitude)
+  .htmlElement(d => {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'riot-marker';
+    wrapper.style.cssText = `
+      width: ${CONFIG.riotLogoSize}px;
+      height: ${CONFIG.riotLogoSize}px;
+      cursor: pointer;
+      transform: translate(-50%, -50%);
+      transition: transform 0.2s ease;
+    `;
+    
+    const img = document.createElement('img');
+    img.src = riotLogoUrl;
+    img.alt = d.name;
+    img.style.cssText = `
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      filter: drop-shadow(0 0 8px ${CONFIG.riotLogoGlow});
+    `;
+    
+    wrapper.appendChild(img);
+    
+    // Hover effect + tooltip
+    wrapper.addEventListener('mouseenter', () => {
+      wrapper.style.transform = 'translate(-50%, -50%) scale(1.25)';
+      showTooltip(`
+        <div class="riot-tooltip">
+          <strong>RIOT Games</strong><br>
+          ${d.name}<br>
+          <small>Region: ${d.region}</small>
+        </div>
+      `);
+    });
+    
+    wrapper.addEventListener('mouseleave', () => {
+      wrapper.style.transform = 'translate(-50%, -50%)';
+      hideTooltip();
+    });
+    
+    // Click to fly
+    wrapper.addEventListener('click', () => {
+      globe.pointOfView(
+        { lat: d.lat, lng: d.lng, altitude: 1.2 },
+        CONFIG.cameraFlyDuration
+      );
+    });
+    
+    return wrapper;
   });
 
 // ============================================================================
@@ -725,9 +774,8 @@ const regionState = {
 };
 
 function filterDataByRegion() {
-  // Filter points
+  // Filter points (RIOT now in htmlElementsData, always visible)
   const filteredPoints = [
-    ...riotPoints, // RIOT always visible
     ...popPoints.filter(p => regionState[p.region]),
     ...partnerDots.filter(p => {
       const pop = popPoints.find(pop => pop.city === p.city);
@@ -735,9 +783,9 @@ function filterDataByRegion() {
     })
   ];
 
-  // Filter labels
+  // Filter labels (RIOT labels always visible)
   const filteredLabels = [
-    ...riotLabels, // RIOT labels always visible
+    ...riotLabels,
     ...partnerLabels.filter(p => {
       const pop = popPoints.find(pop => pop.city === p.city);
       return pop && regionState[pop.region];
